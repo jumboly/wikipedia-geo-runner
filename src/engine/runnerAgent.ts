@@ -1,4 +1,5 @@
-import { evaluate, type Answer, type EvaluateOptions, type JevAuth } from '../lib/jev/client'
+import type { Answer, EvaluateOptions } from '@jumboly/jev-client'
+import type { AnswerSource, Evaluator } from '@jumboly/jev-client'
 import type { WikiSection } from '../lib/wiki/api'
 import type { Action, Goal, RaceEntry, RaceSettings, RunnerState } from './types'
 
@@ -21,11 +22,18 @@ export interface TurnContext {
 export interface Decision {
   action: Action
   probs: Record<string, number>
+  /** 誰が判断したか。JEV 以外（録画・ダミー）の手は結果で区別できるようにする */
+  source: AnswerSource | 'human'
 }
+
+// 階層 Choice で複数回答えた場合、1つでも JEV 以外が混ざればそちらを採る
+const worst = (a: AnswerSource, b: AnswerSource | 'human'): AnswerSource | 'human' => (a === 'jev' ? b : a === 'mock' || b === 'mock' ? 'mock' : a)
 
 // JEV の choice は最大 255 候補
 const MAX_OPTIONS = 255
-const BACK = 'BACK'
+/** JEV の choice で BACK を表すキー。ダミー判断役に避けさせる時にも使う */
+export const BACK_KEY = 'BACK'
+const BACK = BACK_KEY
 
 export function buildState(c: TurnContext) {
   const route = c.runner.route.slice(-12).map((s) => (s.kind === 'move' || s.kind === 'start' ? s.title : `${s.title}（${s.kind === 'back' ? 'BACKで戻った' : '行き止まりで戻った'}）`))
@@ -80,7 +88,7 @@ function topProbs(ans: Answer | undefined, label: (k: string) => string): Record
   )
 }
 
-export async function decide(auth: JevAuth, c: TurnContext, canBack: boolean, opts: EvaluateOptions): Promise<Decision> {
+export async function decide(evaluator: Evaluator, c: TurnContext, canBack: boolean, opts: EvaluateOptions): Promise<Decision> {
   const visited = new Set(c.runner.visited)
   const sections = c.sections
     .map((s) => ({ title: s.title, links: s.links.filter((t) => !visited.has(t)) }))
@@ -93,8 +101,7 @@ export async function decide(auth: JevAuth, c: TurnContext, canBack: boolean, op
     const criteria: Record<string, string> = {}
     links.forEach((t, i) => (criteria[`L${i + 1}`] = t))
     if (withBack) Object.assign(criteria, backOpt)
-    const ans = await evaluate(
-      auth,
+    const { answers: ans, source } = await evaluator(
       state,
       {
         move: {
@@ -110,6 +117,7 @@ export async function decide(auth: JevAuth, c: TurnContext, canBack: boolean, op
     return {
       action: key === BACK ? { type: 'back' } : { type: 'link', title: criteria[key] },
       probs: topProbs(ans.move, label),
+      source,
     }
   }
 
@@ -135,8 +143,7 @@ export async function decide(auth: JevAuth, c: TurnContext, canBack: boolean, op
     criteria[`S${i + 1}`] = `セクション「${g.title}」（リンク${g.links.length}件）: ${preview}${more}`
   })
   Object.assign(criteria, backOpt)
-  const ans = await evaluate(
-    auth,
+  const { answers: ans, source: sectionSource } = await evaluator(
     state,
     {
       section: {
@@ -148,8 +155,9 @@ export async function decide(auth: JevAuth, c: TurnContext, canBack: boolean, op
     opts,
   )
   const key = pick(ans.section, c.settings.choiceMode, Object.keys(criteria))
-  if (key === BACK) return { action: { type: 'back' }, probs: { BACK: ans.section.probabilities?.[BACK] ?? 1 } }
+  if (key === BACK) return { action: { type: 'back' }, probs: { BACK: ans.section.probabilities?.[BACK] ?? 1 }, source: sectionSource }
   const g = groups[Number(key.slice(1)) - 1]
   // セクション選択後は BACK を候補に含めない（BACK 判断は第1段で済んでいるため）
-  return chooseLinks(g.links, `（セクション「${g.title}」内のリンクから選択）`, false)
+  const d = await chooseLinks(g.links, `（セクション「${g.title}」内のリンクから選択）`, false)
+  return { ...d, source: worst(sectionSource, d.source) }
 }

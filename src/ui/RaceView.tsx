@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { RaceSnapshot } from '../engine/types'
+import { CostChip, GateBanner } from './JevMeter'
 import { MapView, RUNNER_COLORS } from './MapView'
 import { Reader } from './Reader'
 import type { useRace } from './useRace'
@@ -34,6 +35,7 @@ export function RaceView({ race }: { race: Race }) {
           ターン {s.turn} / {s.config.settings.maxTurns}
         </span>
         <span className="goal-name">🏁 {s.config.goal.name}</span>
+        <CostChip stats={s.jev} />
         {!hasHuman && !s.finished && (
           <>
             <button onClick={race.step} disabled={race.readyTurn == null || race.mode !== 'step'}>
@@ -65,7 +67,7 @@ export function RaceView({ race }: { race: Race }) {
             ⚠ {race.error.message}{' '}
             {race.error.recoverable && <button onClick={race.retry}>再試行</button>}
           </span>
-        ) : race.status ? (
+        ) : race.status && !(race.gate && race.gate.cooldownUntil > Date.now()) ? (
           <span className="status">{race.status}</span>
         ) : waiting.length ? (
           <span className="muted">🤔 思考中: {waiting.map((id) => nameOf(id).name).join('、')}</span>
@@ -74,6 +76,7 @@ export function RaceView({ race }: { race: Race }) {
         ) : race.readyTurn != null && !hasHuman ? (
           <span className="status">✅ ターン {race.readyTurn} の手が揃いました{race.mode === 'step' ? '（Step で公開）' : ''}</span>
         ) : null}
+        {!race.error && <GateBanner gate={race.gate} />}
       </div>
 
       <div className="tabs mobile-only">

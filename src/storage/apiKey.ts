@@ -1,4 +1,5 @@
-import type { JevAuth } from '../lib/jev/client'
+import type { JevAuth } from '@jumboly/jev-client'
+import { BACK_KEY } from '../engine/runnerAgent'
 
 /**
  * AI Gateway API キーの保管。
@@ -42,9 +43,10 @@ export function clearApiKey() {
  * import.meta.env.DEV は本番ビルドで false に静的置換されるため、proxy 分岐は本番に残らない。
  */
 export function resolveAuth(useMock: boolean): JevAuth | null {
-  if (useMock) return { mode: 'mock' }
+  if (useMock) return { mode: 'mock', avoidKeys: [BACK_KEY] }
   const k = loadApiKey()
   if (k) return { mode: 'key', apiKey: k.key }
-  if (import.meta.env.DEV) return { mode: 'dev-proxy', origin: new URL(import.meta.env.BASE_URL, location.href).toString() }
+  // vite.config.ts の /dev-jev プロキシが .env のキーを付与する
+  if (import.meta.env.DEV) return { mode: 'proxy', url: new URL('dev-jev/v1/evaluate', new URL(import.meta.env.BASE_URL, location.href)).toString() }
   return null
 }

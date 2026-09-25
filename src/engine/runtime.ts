@@ -1,10 +1,10 @@
-import { JevError, type JevAuth } from '../lib/jev/client'
+import { isRecoverable, type Evaluator } from '@jumboly/jev-client'
 import type { GeoPoint } from '../lib/geo/geo'
-import type { WikiArticle, WikiClient } from '../lib/wiki/api'
+import type { ArticleSource, WikiArticle } from '../lib/wiki/api'
 import type { FromWorker, HumanPrompt } from '../worker/protocol'
 import { applyAction, applyForcedBacks, canBack, computeResults, inGeofence, inGoal, isLegal, newRunnerState, unvisitedLinks } from './rules'
 import { decide, type Decision } from './runnerAgent'
-import type { Action, MoveRecord, RaceConfig, RaceSnapshot, RunnerState } from './types'
+import { emptyJevStats, type Action, type MoveRecord, type RaceConfig, type RaceSnapshot, type RunnerState } from './types'
 
 /**
  * 半同期ターン制のレース進行。
@@ -19,13 +19,30 @@ export class RaceRuntime {
   private forced = new Map<string, string[]>()
   private abort = new AbortController()
   private preparing = false
+  private stats = emptyJevStats()
+  /** 実際に JEV を呼んだ分だけ集計する（録画再生・ダミーは課金されない） */
+  private counted: Evaluator
 
   constructor(
     private readonly config: RaceConfig,
-    private readonly wiki: WikiClient,
-    private readonly auth: JevAuth,
+    private readonly wiki: ArticleSource,
+    private readonly evaluator: Evaluator,
     private readonly emit: (m: FromWorker) => void,
-  ) {}
+    /** JEV の最大試行回数。代替の判断役を連結している場合は小さくする */
+    private readonly maxAttempts?: number,
+    /** 共有の待機がこれより長ければ待たずに失敗させる（代替の判断役がある場合のみ指定） */
+    private readonly maxWaitMs?: number,
+  ) {
+    this.counted = async (state, questions, opts) => {
+      const r = await this.evaluator(state, questions, opts)
+      if (r.usage) {
+        this.stats.calls++
+        this.stats.inputTokens += r.usage.inputTokens
+        this.stats.costUsd += r.usage.costUsd
+      }
+      return r
+    }
+  }
 
   private async article(title: string): Promise<WikiArticle> {
     const a = await this.wiki.getArticle(title)
@@ -51,6 +68,7 @@ export class RaceRuntime {
   }
 
   private emitSnapshot() {
+    this.snap.jev = { ...this.stats }
     this.emit({ type: 'snapshot', snapshot: structuredClone(this.snap) })
   }
 
@@ -100,13 +118,17 @@ export class RaceRuntime {
         }
         try {
           const d = await decide(
-            this.auth,
+            this.counted,
             { entry: e, runner: r, goal: this.config.goal, settings: this.config.settings, turn, sections: art.sections, hint: null },
             canBack(r),
             {
               signal: this.abort.signal,
-              onRetry: ({ attempt, waitMs, status }) =>
-                this.emit({ type: 'status', message: `${e.name}: JEV ${status} 混雑のため再試行 ${attempt}回目（${Math.round(waitMs / 1000)}秒待機）` }),
+              maxAttempts: this.maxAttempts,
+              maxWaitMs: this.maxWaitMs,
+              onRetry: ({ attempt, waitMs, status }) => {
+                this.stats.retries++
+                this.emit({ type: 'status', message: `${e.name}: JEV ${status} 混雑のため再試行 ${attempt}回目（全員 ${Math.round(waitMs / 1000)}秒待機）` })
+              },
             },
           )
           if (!isLegal(r, d.action, this.links(r.current))) throw new Error(`${e.name} の手が不正です`)
@@ -120,7 +142,7 @@ export class RaceRuntime {
     if (failed) {
       // 失敗した Runner の手をコードで代打ちすると JEV のレースでなくなるため、一時停止して再試行を待つ
       const msg = failed instanceof Error ? failed.message : String(failed)
-      this.emit({ type: 'error', message: msg, recoverable: !(failed instanceof JevError) || failed.retryable || failed.status === 599 })
+      this.emit({ type: 'error', message: msg, recoverable: isRecoverable(failed) })
       return
     }
     this.checkReady(turn)
@@ -151,7 +173,7 @@ export class RaceRuntime {
       this.emit({ type: 'error', message: '不正な手です', recoverable: true })
       return
     }
-    this.decisions.set(runnerId, { action, probs: {} })
+    this.decisions.set(runnerId, { action, probs: {}, source: 'human' })
     this.checkReady(this.snap.turn + 1)
   }
 
@@ -189,7 +211,7 @@ export class RaceRuntime {
       } else if (d.action.type === 'link' && inGeofence(here, this.config.goal)) {
         r.route[r.route.length - 1].tooLarge = true
       }
-      moves.push({ runnerId: r.runnerId, action: d.action, from, to: r.current, forcedBacks: this.forced.get(r.runnerId) ?? [], probs: d.probs })
+      moves.push({ runnerId: r.runnerId, action: d.action, from, to: r.current, forcedBacks: this.forced.get(r.runnerId) ?? [], probs: d.probs, source: d.source })
     }
     this.snap.turns.push({ turn, moves, goals })
     this.snap.turn = turn
@@ -209,6 +231,7 @@ export class RaceRuntime {
   }
 
   private finish() {
+    this.snap.jev = { ...this.stats }
     this.snap.finished = true
     this.emit({ type: 'finished', snapshot: structuredClone(this.snap) })
   }

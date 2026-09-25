@@ -10,6 +10,8 @@ import { RunnersView } from './ui/RunnersView'
 import { DEFAULT_SETTINGS, SettingsView, type AppSettings } from './ui/SettingsView'
 import { SetupView } from './ui/SetupView'
 import { useRace } from './ui/useRace'
+import { BACK_KEY } from './engine/runnerAgent'
+import { formatUsd } from './ui/JevMeter'
 
 type Page = 'setup' | 'race' | 'result' | 'runners' | 'history' | 'settings'
 
@@ -113,7 +115,7 @@ export default function App() {
               setAuthError(false)
               prediction.current = pred
               race.setIntervalMs(settings.autoIntervalMs)
-              race.start(config, auth ?? { mode: 'mock' })
+              race.start(config, auth ?? { mode: 'mock', avoidKeys: [BACK_KEY] }, settings.jevRatePerMin)
               setPage('race')
             }}
           />
@@ -125,6 +127,12 @@ export default function App() {
         {page === 'history' && (
           <div className="page narrow">
             <h2>レース履歴</h2>
+            {races.length > 0 && (
+              <p className="small muted">
+                累計 JEV コスト: {formatUsd(races.reduce((a, r) => a + (r.snapshot.jev?.costUsd ?? 0), 0))}（
+                {races.reduce((a, r) => a + (r.snapshot.jev?.calls ?? 0), 0)} 回・{races.length} レース。AI Gateway の定価ベースの概算）
+              </p>
+            )}
             {races.length === 0 && <p className="muted">まだレースがありません。</p>}
             {races.map((r) => {
               const w = r.results.filter((x) => x.rank === 1).map((x) => r.snapshot.config.entries.find((e) => e.runnerId === x.runnerId))
@@ -142,7 +150,7 @@ export default function App() {
                     <span className="small muted">{new Date(r.createdAt).toLocaleString()}</span>
                   </div>
                   <div className="small">
-                    {r.snapshot.config.entries.map((e) => e.icon).join(' ')} ・ 勝者: {w.length ? w.map((e) => `${e?.icon} ${e?.name}`).join('、') : 'なし'} ・ {r.snapshot.turn}ターン
+                    {r.snapshot.config.entries.map((e) => e.icon).join(' ')} ・ 勝者: {w.length ? w.map((e) => `${e?.icon} ${e?.name}`).join('、') : 'なし'} ・ {r.snapshot.turn}ターン{r.snapshot.jev ? ` ・ ${formatUsd(r.snapshot.jev.costUsd)}` : ''}
                   </div>
                 </div>
               )

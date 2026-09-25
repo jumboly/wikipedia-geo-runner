@@ -6,8 +6,17 @@
   AI Gateway は CORS 許可済み（preflight 実測）→ ブラウザから直接呼ぶ。choice 最大 255 候補、state 32k tokens。
 - **認証**: 本番 = ユーザーが設定画面で入力したキー（localStorage または sessionStorage）。
   開発 = `.env` の `AI_GATEWAY_API_KEY` を Vite dev proxy `/dev-jev` がサーバー側で付与（バンドルに入らない）。
-- **429/503 多発**: Limiter(3) + `retry-after`/`x-should-retry` 準拠の指数バックオフ（最大 8 回）。
-  最終失敗時は代打ちせずレース一時停止 →「再試行」。
+- **JEV クライアントは SDK に分離**: `packages/jev-client`（`@jumboly/jev-client`、npm workspaces）。使い方と実測結果は同 README が正本。
+  **独立リポジトリ `~/src/jev-client` へ切り出し中**（残作業は同 `HANDOFF.md`）。切り替えが済むまでは `packages/jev-client` が正本。
+  汎用的な JEV の知識はユーザースキル `j-jev`（`~/src/cc-jumboly/skills/j-jev/` → `~/.claude/skills/j-jev/`）。
+- **429/503 対策**: 全 JEV 呼び出しで共有する `JevGate`（`packages/jev-client/src/gate.ts`）。
+  1 件失敗したら全員で共有待機、失敗で同時実行数半減→成功で回復、1 呼び出し 20 秒で打ち切り。
+  回数上限は**既定 auto = 上限なし**。429 が出た時だけ直近 1 分の成功数から上限を推定してペースを落とし、
+  429 が止めば 1 分ごとに 25% 緩めて上限なしへ戻す（設定で固定値も可）。最大 20 回試行後は代打ちせず一時停止。
+- **JEV エラー傾向の実測**（2026-09-25 時点・JEV 公開直後の混雑による**一時的な値**。恒久仕様として扱わない。
+  再計測は `npm run probe`）:
+  - 429 = 毎分約 30 回の上限超過（retry-after は次の分の区切りまで）。503/500 = 上流障害で数秒単位で連続。
+  - 応答なしで固まる呼び出しあり。成功時の遅延は中央値 0.34 秒。
 - **MediaWiki**: `origin=*` + `Api-User-Agent`、同時 4 接続、maxlag=5。
   合法手 = parse HTML 本文の `/wiki/` リンク − 除外 class（navbox, reference, hatnote 等）− 脚注/外部リンク節 − 名前空間 − 赤リンク。
   `mw-redirect` のみ query で正規化。ルールは `src/lib/wiki/rules.ts` に一元化（Reader と共有）。
@@ -34,6 +43,14 @@
 ## 次の作業
 GitHub issues で管理（jumboly/wikipedia-geo-runner）。
 
+## エンジン単独実行（CLI）と判断役の差し替え
+- 判断役は `Evaluator`（`packages/jev-client/src/evaluator.ts`）。`jev` / `mock` / `replay`（録画再生）を `withFallback` で連結できる。
+  手ごとに判断元（`MoveRecord.source`）を記録し、JEV 以外が混ざったレースは正式扱いしない。本番（Pages 版）は jev 単体。
+- `npm run race -- --goal 大阪城 --runners 4`（既定 `--jev live --fallback replay,mock`）。成功した JEV 回答は
+  `.cache/jev-recordings.json` に録画、Wikipedia 応答は `.cache/wiki/` にキャッシュ。
+  `--jev replay` はキャッシュと録画だけで同じレースを完全再現（ネット不要）。`--jev mock` はダミー。
+- Claude などの他 AI による代打は使わない（要件「AI は JEV のみ」、ユーザー決定 2026-09-25）。
+
 ## テスト
-- `npm test`: リンク抽出（実データ fixture）とルールのユニットテスト
+- `npm test`: リンク抽出（実データ fixture）・ルール・ヘッドレス結合テスト（架空リンク網で代替/録画再生を検証）
 - `node e2e/mock-race.mjs` / `node e2e/human-mobile.mjs`: dev server 起動中に実行（`APP_URL`・`SHOT` 環境変数）

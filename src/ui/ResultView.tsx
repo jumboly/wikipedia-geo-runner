@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { RaceRecord } from '../storage/db'
+import { CostChip } from './JevMeter'
 import { MapView, RUNNER_COLORS } from './MapView'
 import { currentTitleAt, mapRunnersAt, STEP_MARK } from './view'
 
@@ -81,6 +82,11 @@ export function ResultView({ record, onBack }: { record: RaceRecord; onBack: () 
             })}
           </tbody>
         </table>
+        {s.jev && (
+          <p className="small">
+            JEV 利用: <CostChip stats={s.jev} /> ・ 再試行 {s.jev.retries} 回（再試行は課金されません）
+          </p>
+        )}
 
         <section className="card">
           <h3>Replay</h3>

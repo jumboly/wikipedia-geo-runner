@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Action, Goal, RaceConfig, RaceSnapshot } from '../engine/types'
-import type { JevAuth } from '../lib/jev/client'
+import type { JevAuth } from '@jumboly/jev-client'
+import type { GateState } from '@jumboly/jev-client'
 import type { FromWorker, HumanPrompt, ToWorker } from '../worker/protocol'
 
 export type PlayMode = 'step' | 'auto' | 'fast'
@@ -64,9 +65,10 @@ export interface RaceUiState {
   status: string | null
   error: { message: string; recoverable: boolean } | null
   finished: boolean
+  gate: GateState | null
 }
 
-const initial: RaceUiState = { snapshot: null, humans: {}, readyTurn: null, thinking: [], status: null, error: null, finished: false }
+const initial: RaceUiState = { snapshot: null, humans: {}, readyTurn: null, thinking: [], status: null, error: null, finished: false, gate: null }
 
 /**
  * レースの観戦制御。再生モードは「公開タイミング」だけを変え、ゲームルール（1ターン=全員1リンク）は変えない。
@@ -92,6 +94,8 @@ export function useRace(onFinished: (s: RaceSnapshot) => void) {
             return { ...s, readyTurn: m.turn, thinking: [], humans: {}, status: null }
           case 'status':
             return { ...s, status: m.message }
+          case 'jev-gate':
+            return { ...s, gate: m.state }
           case 'error':
             return { ...s, error: { message: m.message, recoverable: m.recoverable } }
           case 'finished':
@@ -124,9 +128,10 @@ export function useRace(onFinished: (s: RaceSnapshot) => void) {
     }
   }, [st.readyTurn, st.finished, mode, intervalMs, hasHuman])
 
-  const start = useCallback((config: RaceConfig, auth: JevAuth) => {
-    setSt(initial)
-    send({ type: 'start', config, auth })
+  const start = useCallback((config: RaceConfig, auth: JevAuth, jevRatePerMin?: number) => {
+    // gate は Worker 全体で共有の状態なので、レースをまたいで引き継ぐ
+    setSt((s) => ({ ...initial, gate: s.gate }))
+    send({ type: 'start', config, auth, jevRatePerMin })
   }, [])
 
   return {

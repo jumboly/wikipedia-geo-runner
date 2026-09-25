@@ -1,4 +1,5 @@
-import type { JevAuth } from '../lib/jev/client'
+import type { JevAuth } from '@jumboly/jev-client'
+import type { GateState } from '@jumboly/jev-client'
 import type { Action, Goal, RaceConfig, RaceSnapshot } from '../engine/types'
 
 export interface HumanPrompt {
@@ -16,7 +17,7 @@ export interface HumanPrompt {
 }
 
 export type ToWorker =
-  | { type: 'start'; config: RaceConfig; auth: JevAuth }
+  | { type: 'start'; config: RaceConfig; auth: JevAuth; jevRatePerMin?: number }
   | { type: 'reveal' }
   | { type: 'human-move'; runnerId: string; action: Action }
   | { type: 'retry' }
@@ -33,6 +34,8 @@ export type FromWorker =
   | { type: 'thinking'; turn: number; pending: string[] }
   | { type: 'human'; prompt: HumanPrompt }
   | { type: 'status'; message: string }
+  /** 全 JEV 呼び出し共有の待機・同時実行数の状態 */
+  | { type: 'jev-gate'; state: GateState }
   | { type: 'error'; message: string; recoverable: boolean }
   | { type: 'finished'; snapshot: RaceSnapshot }
   | { type: 'setup-result'; reqId: number; ok: true; value: unknown }

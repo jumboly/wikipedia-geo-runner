@@ -25,6 +25,6 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    test: { include: ['tests/**/*.test.ts'] },
+    test: { include: ['tests/**/*.test.ts', 'packages/*/test/**/*.test.ts'] },
   }
 })

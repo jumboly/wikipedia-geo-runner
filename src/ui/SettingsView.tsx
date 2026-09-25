@@ -13,6 +13,8 @@ export interface AppSettings {
   flatLimit: number
   regionId: string
   autoIntervalMs: number
+  /** JEV の 1 分あたり呼び出し上限。0 = 自動（429 発生時のみ学習して抑え、止めば徐々に解除） */
+  jevRatePerMin: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flatLimit: 200,
   regionId: 'japan',
   autoIntervalMs: 1500,
+  jevRatePerMin: 0,
 }
 
 interface Props {
@@ -90,6 +93,14 @@ export function SettingsView({ settings: s, onChange }: Props) {
             {import.meta.env.DEV && <p className="small muted">開発モード: キー未入力時は .env の AI_GATEWAY_API_KEY を dev proxy 経由で使用します。</p>}
           </>
         )}
+        <label>
+          JEV 呼び出し上限（回/分、0 = 自動）
+          <input type="number" min={0} max={600} value={s.jevRatePerMin} onChange={num('jevRatePerMin')} />
+          <span className="small muted">
+            自動: 普段は上限なし。回数上限エラー（429）が出た時だけ送信ペースを落とし、収まれば徐々に元に戻します。
+            数値を入れるとその回数に固定します。
+          </span>
+        </label>
         <label className="inline">
           <input type="checkbox" checked={s.useMock} onChange={(e) => onChange({ ...s, useMock: e.target.checked })} /> モック JEV（API を呼ばずランダムに選択。動作確認用）
         </label>

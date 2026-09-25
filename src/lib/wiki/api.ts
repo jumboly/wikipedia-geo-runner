@@ -30,12 +30,27 @@ export interface WikiArticle {
   disambiguation: boolean
 }
 
-export class WikiClient {
+/** エンジンが必要とする記事取得の最小インターフェース。テストでは架空のリンク網に差し替える */
+export interface ArticleSource {
+  getArticle(title: string): Promise<WikiArticle>
+}
+
+export interface WikiClientOptions {
+  /** Node では User-Agent を設定できる（Wikimedia の利用規約で連絡先入り UA が求められる） */
+  userAgent?: string
+  /** Node CLI でレスポンスをファイルキャッシュするために差し替える */
+  fetch?: typeof fetch
+}
+
+export class WikiClient implements ArticleSource {
   private namespaces: Promise<Set<string>> | null = null
   private articleCache = new Map<string, Promise<WikiArticle>>()
   private coordCache = new Map<string, GeoPoint | null>()
 
-  constructor(readonly lang: string) {}
+  constructor(
+    readonly lang: string,
+    private readonly options: WikiClientOptions = {},
+  ) {}
 
   private get base() {
     return `https://${this.lang}.wikipedia.org/w/api.php`
@@ -47,7 +62,9 @@ export class WikiClient {
     const url = `${this.base}?${q}`
     return limiter.run(async () => {
       for (let attempt = 0; ; attempt++) {
-        const res = await fetch(url, { headers: { 'Api-User-Agent': API_USER_AGENT } })
+        const headers: Record<string, string> = { 'Api-User-Agent': API_USER_AGENT }
+        if (this.options.userAgent) headers['User-Agent'] = this.options.userAgent
+        const res = await (this.options.fetch ?? fetch)(url, { headers })
         const retryAfter = Number(res.headers.get('retry-after'))
         if (res.ok) {
           const json = await res.json()

@@ -2,6 +2,8 @@
 import { RaceRuntime } from '../engine/runtime'
 import { randomGoal, randomStart, REGIONS, validateStart } from '../engine/placement'
 import { WikiClient } from '../lib/wiki/api'
+import { jevEvaluator } from '@jumboly/jev-client'
+import { defaultGate } from '@jumboly/jev-client'
 import type { FromWorker, ToWorker } from './protocol'
 
 /**
@@ -19,6 +21,9 @@ const wiki = (lang: string) => {
 
 let runtime: RaceRuntime | null = null
 
+// 待機状況を UI に流す。inFlight の増減で頻繁に発火するが、メッセージは小さいのでそのまま送る
+defaultGate.subscribe((state) => post({ type: 'jev-gate', state }))
+
 async function setup(reqId: number, fn: () => Promise<unknown>) {
   try {
     post({ type: 'setup-result', reqId, ok: true, value: await fn() })
@@ -33,7 +38,8 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
     switch (m.type) {
       case 'start':
         runtime?.stop()
-        runtime = new RaceRuntime(m.config, wiki(m.config.settings.lang), m.auth, post)
+        if (m.jevRatePerMin != null) defaultGate.configure({ ratePerMin: m.jevRatePerMin })
+        runtime = new RaceRuntime(m.config, wiki(m.config.settings.lang), jevEvaluator(m.auth), post)
         await runtime.start()
         break
       case 'reveal':

@@ -32,7 +32,8 @@ console.log('max frame gap ms during race:', Math.round(await jank))
 // 進行状況を 20 秒ごとに出力し、止まっているのか長いだけなのかを判別できるようにする
 const ticker = setInterval(async () => {
   try {
-    console.log('[tick]', Math.round((Date.now() - t0) / 1000) + 's', await page.locator('.controls .turn').innerText(), '|', await page.locator('.status-line').innerText())
+    console.log('[tick]', Math.round((Date.now() - t0) / 1000) + 's', await page.locator('.controls .turn').innerText(), '|', await page.locator('.cost-chip').innerText().catch(() => '-'), '|', await page.locator('.status-line').innerText())
+    if (await page.locator('.gate.cooling').count()) await page.screenshot({ path: SHOT + '/gate-cooling.png' })
   } catch {}
 }, 20000)
 await page.getByRole('heading', { name: 'レース結果' }).waitFor({ timeout: 600000 }).catch(async (e) => {
@@ -42,6 +43,7 @@ await page.getByRole('heading', { name: 'レース結果' }).waitFor({ timeout: 
 clearInterval(ticker)
 console.log('race finished in', Math.round((Date.now() - t0) / 1000), 's')
 console.log(await page.locator('table.results').innerText())
+console.log('cost:', await page.locator('p', { hasText: 'JEV 利用' }).innerText().catch(() => '-'))
 console.log(await page.locator('.card', { hasText: 'Wikipedia ルート' }).innerText())
 await page.screenshot({ path: SHOT + '/result.png' })
 console.log('errors:', errors.slice(0, 10))

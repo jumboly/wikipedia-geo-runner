@@ -77,6 +77,8 @@ export interface MoveRecord {
   forcedBacks: string[]
   /** JEV の選択確率（観戦用）。上位のみ */
   probs?: Record<string, number>
+  /** 判断元。jev 以外（録画再生・ダミー）の手が混ざったレースは正式な JEV のレースとして扱わない */
+  source?: 'jev' | 'replay' | 'mock' | 'human'
 }
 
 export interface TurnRecord {
@@ -85,12 +87,26 @@ export interface TurnRecord {
   goals: string[]
 }
 
+/** JEV の利用量。コスト表示と混雑状況の振り返りに使う */
+export interface JevStats {
+  /** 成功した JEV 呼び出し回数（課金対象） */
+  calls: number
+  inputTokens: number
+  costUsd: number
+  /** 429/503 等で再試行した回数（課金されない） */
+  retries: number
+}
+
+export const emptyJevStats = (): JevStats => ({ calls: 0, inputTokens: 0, costUsd: 0, retries: 0 })
+
 export interface RaceSnapshot {
   config: RaceConfig
   turn: number
   runners: RunnerState[]
   turns: TurnRecord[]
   finished: boolean
+  /** 旧バージョンで保存した履歴には無い */
+  jev?: JevStats
 }
 
 export interface RaceResult {
