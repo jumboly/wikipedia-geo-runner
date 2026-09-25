@@ -1,3 +1,4 @@
+import type { JevProvider } from '@jumboly/jev-client'
 import type { GeoPoint, LatLon } from '../lib/geo/geo'
 
 export interface Goal {
@@ -95,6 +96,8 @@ export interface JevStats {
   costUsd: number
   /** 429/503 等で再試行した回数（課金されない） */
   retries: number
+  /** 呼んだ経路。costUsd の意味が変わる（gateway は定価ベース、typesafe は公表単価からの概算） */
+  provider?: JevProvider
 }
 
 export const emptyJevStats = (): JevStats => ({ calls: 0, inputTokens: 0, costUsd: 0, retries: 0 })

@@ -8,6 +8,10 @@ page.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message))
 await page.goto(process.env.APP_URL ?? 'http://localhost:5173/')
 await page.getByRole('button', { name: '⚙ 設定' }).click()
 if (process.env.REAL !== '1') await page.getByText('モック JEV').click()
+// ROUTE=typesafe で TypeSafe 直接（dev server の /dev-jev/typesafe 経由）を試す。既定は設定画面の既定（gateway）
+if (process.env.ROUTE === 'typesafe') await page.getByLabel('TypeSafe 直接（開発時のみ）').check()
+const jevHits = {}
+page.on('response', (r) => { const m = r.url().match(/dev-jev\/(\w+)|ai-gateway\.vercel\.sh|api\.typesafe\.ai/); if (m) { const k = (m[1] ?? m[0]) + ' ' + r.status(); jevHits[k] = (jevHits[k] ?? 0) + 1 } })
 await page.getByRole('button', { name: '🏁 レース' }).click()
 if (process.env.GOAL === 'random') {
   await page.getByRole('button', { name: '🎲 ランダム生成' }).click()
@@ -46,5 +50,6 @@ console.log(await page.locator('table.results').innerText())
 console.log('cost:', await page.locator('p', { hasText: 'JEV 利用' }).innerText().catch(() => '-'))
 console.log(await page.locator('.card', { hasText: 'Wikipedia ルート' }).innerText())
 await page.screenshot({ path: SHOT + '/result.png' })
+console.log('JEV requests:', jevHits)
 console.log('errors:', errors.slice(0, 10))
 await browser.close()

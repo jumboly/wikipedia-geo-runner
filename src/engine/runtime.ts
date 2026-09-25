@@ -39,6 +39,7 @@ export class RaceRuntime {
         this.stats.calls++
         this.stats.inputTokens += r.usage.inputTokens
         this.stats.costUsd += r.usage.costUsd
+        if (r.provider) this.stats.provider = r.provider
       }
       return r
     }

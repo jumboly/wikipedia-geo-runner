@@ -6,6 +6,7 @@
  *   npm run race -- --goal 大阪城 --starts 姫路城,奈良公園 --jev replay
  *
  * --jev live   : 実 JEV（成功した回答は録画）。失敗時は --fallback の順に代替（既定: replay,mock）
+ *                --route gateway|typesafe で経路を選ぶ（既定: gateway。キーは AI_GATEWAY_API_KEY / TYPESAFE_API_KEY）
  * --jev replay : 録画のみ。Wikipedia もキャッシュのみ使用し、同じ条件のレースを完全に再現する
  * --jev mock   : ダミー（ランダム）
  */
@@ -16,7 +17,7 @@ import { runHeadless } from '../engine/headless'
 import { goalFromArticle, randomGoal, randomStart, REGIONS, validateStart } from '../engine/placement'
 import { computeResults } from '../engine/rules'
 import type { Goal, RaceConfig, RaceSnapshot } from '../engine/types'
-import { defaultGate } from '@jumboly/jev-client'
+import { defaultGates, type JevProvider } from '@jumboly/jev-client'
 import { jevEvaluator, mockEvaluator, recording, replayEvaluator, withFallback, type Evaluator } from '@jumboly/jev-client'
 import { WikiClient } from '../lib/wiki/api'
 import { DEFAULT_RUNNERS } from '../ui/presets'
@@ -41,6 +42,8 @@ const { values: a } = parseArgs({
     backs: { type: 'string', default: '3' },
     lang: { type: 'string', default: 'ja' },
     jev: { type: 'string', default: 'live' },
+    // Web 版の既定と揃える。どちらで走ったかは開始時に表示する
+    route: { type: 'string', default: 'gateway' },
     fallback: { type: 'string', default: 'replay,mock' },
     'max-attempts': { type: 'string', default: '3' },
     // 共有の待機がこの秒数を超えるなら待たずに代替へ。JEV の 429 は 30〜57 秒の retry-after が多いので既定はそれより長く
@@ -57,12 +60,16 @@ const { values: a } = parseArgs({
 if (a.help) {
   console.log(
     `Usage: npm run race -- [--goal <記事名> | --goal-random japan|world] [--starts a,b,..] [--runners N]\n` +
-      `  [--jev live|replay|mock] [--fallback replay,mock|none] [--max-attempts N] [--max-turns N] [--radius km] [--out file]`,
+      `  [--jev live|replay|mock] [--route gateway|typesafe] [--fallback replay,mock|none] [--max-attempts N] [--max-turns N] [--radius km] [--out file]`,
   )
   process.exit(0)
 }
 
 const log = (...x: unknown[]) => !a.quiet && console.log(...x)
+
+if (a.route !== 'gateway' && a.route !== 'typesafe') throw new Error(`不明な --route: ${a.route}（gateway / typesafe）`)
+const route: JevProvider = a.route
+const KEY_ENV: Record<JevProvider, string> = { gateway: 'AI_GATEWAY_API_KEY', typesafe: 'TYPESAFE_API_KEY' }
 
 async function main() {
   const replayOnly = a.jev === 'replay'
@@ -80,9 +87,11 @@ async function main() {
     } catch {
       /* .env 無しなら環境変数を使う */
     }
-    const key = process.env.AI_GATEWAY_API_KEY
-    if (!key) throw new Error('AI_GATEWAY_API_KEY が .env にも環境変数にもありません（--jev mock / replay なら不要）')
-    const chain = [recording(jevEvaluator({ mode: 'key', apiKey: key }), store)]
+    const key = process.env[KEY_ENV[route]]
+    if (!key) throw new Error(`${KEY_ENV[route]} が .env にも環境変数にもありません（--jev mock / replay なら不要）`)
+    log(`🔌 JEV 経路: ${route}`)
+    // Node からは CORS の制約が無いので、typesafe もプロキシ無しで直接呼べる
+    const chain = [recording(jevEvaluator({ mode: route, apiKey: key }), store)]
     for (const f of a.fallback === 'none' ? [] : a.fallback!.split(',')) {
       if (f === 'replay') chain.push(replayEvaluator(store))
       else if (f === 'mock') chain.push(mockEvaluator({ avoidKeys: [BACK_KEY] }))
@@ -149,10 +158,11 @@ async function main() {
   const t0 = Date.now()
   // snapshot はターン公開後と強制 BACK 後の2回届くことがあるため、同じターンは1回だけ表示する
   let lastLogged = 0
-  defaultGate.configure({ ratePerMin: Number(a.rate) })
+  const gate = defaultGates[route]
+  gate.configure({ ratePerMin: Number(a.rate) })
   let lastCooldown = 0
-  let lastRate = defaultGate.state.ratePerMin
-  defaultGate.subscribe((g) => {
+  let lastRate = gate.state.ratePerMin
+  gate.subscribe((g) => {
     if (g.ratePerMin !== lastRate) {
       log(g.ratePerMin ? `  ⏱ JEV 呼び出し上限を ${g.ratePerMin} 回/分に設定（${g.rateMode === 'auto' ? '429 から推定' : '手動'}）` : '  ⏱ JEV 呼び出し上限を解除')
       lastRate = g.ratePerMin
@@ -167,7 +177,7 @@ async function main() {
     maxAttempts: Number(a['max-attempts']),
     maxWaitMs: hasFallback ? Number(a['max-wait']) * 1000 : undefined,
     onEvent: (m) => {
-      // 待機は defaultGate の購読でまとめて表示するので、Runner ごとの再試行メッセージは出さない
+      // 待機は gate の購読でまとめて表示するので、Runner ごとの再試行メッセージは出さない
       // 最終ターンは snapshot ではなく finished で届く
       if ((m.type === 'snapshot' || m.type === 'finished') && m.snapshot.turns.length) {
         const t = m.snapshot.turns[m.snapshot.turns.length - 1]
@@ -206,7 +216,7 @@ function report(s: RaceSnapshot, sec: number) {
   const nonJev = Object.entries(bySource).filter(([k]) => k !== 'jev')
   console.log(`判断元: ${Object.entries(bySource).map(([k, v]) => `${k}=${v}`).join(' ')}`)
   if (s.jev)
-    console.log(`JEV: ${s.jev.calls} 回 / 入力 ${s.jev.inputTokens} トークン / 概算 $${s.jev.costUsd.toPrecision(3)}（定価ベース）/ 再試行 ${s.jev.retries} 回`)
+    console.log(`JEV: ${s.jev.calls} 回 / 入力 ${s.jev.inputTokens} トークン / 概算 $${s.jev.costUsd.toPrecision(3)}（${s.jev.provider === 'typesafe' ? 'AI Gateway の公表単価から' : '定価ベース'}）/ 再試行 ${s.jev.retries} 回`)
   if (nonJev.length) console.log('⚠ JEV 以外（録画・ダミー）の手を含むため、正式な JEV のレースではありません')
 }
 

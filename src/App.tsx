@@ -34,7 +34,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [races, setRaces] = useState<RaceRecord[]>([])
   const [result, setResult] = useState<RaceRecord | null>(null)
-  const [authError, setAuthError] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
   const prediction = useRef<string | undefined>(undefined)
 
   const reloadRunners = useCallback(async () => setRunners(await listRunners()), [])
@@ -95,9 +95,7 @@ export default function App() {
         </nav>
       </header>
       {authError && (
-        <div className="banner">
-          JEV を使うには 設定 で Vercel AI Gateway API キーを入力してください（またはモック JEV を有効化）。
-        </div>
+        <div className="banner">{authError}</div>
       )}
       <main>
         {page === 'setup' && (
@@ -106,16 +104,16 @@ export default function App() {
             settings={settings}
             onStart={(config, pred) => {
               const needsJev = config.entries.some((e) => e.kind === 'jev')
-              const auth = resolveAuth(settings.useMock)
-              if (needsJev && !auth) {
-                setAuthError(true)
+              const r = resolveAuth(settings.jevRoute, settings.useMock)
+              if (needsJev && !r.ok) {
+                setAuthError(r.reason)
                 setPage('settings')
                 return
               }
-              setAuthError(false)
+              setAuthError(null)
               prediction.current = pred
               race.setIntervalMs(settings.autoIntervalMs)
-              race.start(config, auth ?? { mode: 'mock', avoidKeys: [BACK_KEY] }, settings.jevRatePerMin)
+              race.start(config, r.ok ? r.auth : { mode: 'mock', avoidKeys: [BACK_KEY] }, settings.jevRatePerMin)
               setPage('race')
             }}
           />
@@ -130,7 +128,9 @@ export default function App() {
             {races.length > 0 && (
               <p className="small muted">
                 累計 JEV コスト: {formatUsd(races.reduce((a, r) => a + (r.snapshot.jev?.costUsd ?? 0), 0))}（
-                {races.reduce((a, r) => a + (r.snapshot.jev?.calls ?? 0), 0)} 回・{races.length} レース。AI Gateway の定価ベースの概算）
+                {races.reduce((a, r) => a + (r.snapshot.jev?.calls ?? 0), 0)} 回・{races.length} レース。AI Gateway の定価ベースの概算
+                {/* typesafe は開発時のみ。料金が返らないので意味が違うことを、該当レースがあるときだけ注記する */}
+                {races.some((r) => r.snapshot.jev?.provider === 'typesafe') && '。TypeSafe 直接のレースは公表単価からの概算'}）
               </p>
             )}
             {races.length === 0 && <p className="muted">まだレースがありません。</p>}

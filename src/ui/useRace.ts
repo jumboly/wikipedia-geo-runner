@@ -129,8 +129,9 @@ export function useRace(onFinished: (s: RaceSnapshot) => void) {
   }, [st.readyTurn, st.finished, mode, intervalMs, hasHuman])
 
   const start = useCallback((config: RaceConfig, auth: JevAuth, jevRatePerMin?: number) => {
-    // gate は Worker 全体で共有の状態なので、レースをまたいで引き継ぐ
-    setSt((s) => ({ ...initial, gate: s.gate }))
+    // gate は経路ごとに Worker 全体で共有の状態。開始時に Worker が今回の経路の最新状態を送り直すので、
+    // ここで前の経路（や mock）の表示を引き継がないよう一旦消す
+    setSt({ ...initial })
     send({ type: 'start', config, auth, jevRatePerMin })
   }, [])
 

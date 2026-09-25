@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { clearApiKey, loadApiKey, saveApiKey, type KeyStorage } from '../storage/apiKey'
+import type { JevProvider } from '@jumboly/jev-client'
+import { clearApiKey, loadApiKey, ROUTE_LABEL, saveApiKey, type KeyStorage } from '../storage/apiKey'
 
 export interface AppSettings {
   lang: string
   useMock: boolean
+  /** JEV を呼ぶ経路（開発時のみ選べる）。本番ビルドでは常に gateway として扱う */
+  jevRoute: JevProvider
   maxTurns: number
   backLimit: number
   radiusKm: number
@@ -20,6 +23,8 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   lang: 'ja',
   useMock: false,
+  // 本番（静的サイト）でプロキシ無しに動くのは gateway だけなので、開発時もそれに揃えて既定にする
+  jevRoute: 'gateway',
   maxTurns: 30,
   backLimit: 3,
   radiusKm: 2,
@@ -92,6 +97,25 @@ export function SettingsView({ settings: s, onChange }: Props) {
             </div>
             {import.meta.env.DEV && <p className="small muted">開発モード: キー未入力時は .env の AI_GATEWAY_API_KEY を dev proxy 経由で使用します。</p>}
           </>
+        )}
+        {/* TypeSafe 直接はブラウザから CORS で呼べず、キーを持つ中継が要る。公開サイトには置かず dev proxy でだけ使う */}
+        {import.meta.env.DEV && (
+          <div>
+            <h4>JEV の経路（開発モードのみ）</h4>
+            <div className="row wrap">
+              {(['gateway', 'typesafe'] as const).map((r) => (
+                <label key={r} className="inline">
+                  <input type="radio" checked={s.jevRoute === r} onChange={() => onChange({ ...s, jevRoute: r })} /> {ROUTE_LABEL[r]}
+                </label>
+              ))}
+            </div>
+            {s.jevRoute === 'typesafe' && (
+              <p className="small muted">
+                dev proxy（/dev-jev/typesafe）が .env の TYPESAFE_API_KEY を付けて TypeSafe の API を直接呼びます。
+                料金は返らないため、コストは AI Gateway の公表単価からの概算です。
+              </p>
+            )}
+          </div>
         )}
         <label>
           JEV 呼び出し上限（回/分、0 = 自動）
