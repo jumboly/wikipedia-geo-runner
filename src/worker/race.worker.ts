@@ -2,8 +2,8 @@
 import { RaceRuntime } from '../engine/runtime'
 import { randomGoal, randomStart, REGIONS, validateStart } from '../engine/placement'
 import { WikiClient } from '../lib/wiki/api'
-import { jevEvaluator } from '@jumboly/jev-client'
-import { defaultGate } from '@jumboly/jev-client'
+import { defaultGates, jevEvaluator } from '@jumboly/jev-client'
+import type { JevAuth } from '@jumboly/jev-client'
 import type { FromWorker, ToWorker } from './protocol'
 
 /**
@@ -21,8 +21,18 @@ const wiki = (lang: string) => {
 
 let runtime: RaceRuntime | null = null
 
-// 待機状況を UI に流す。inFlight の増減で頻繁に発火するが、メッセージは小さいのでそのまま送る
-defaultGate.subscribe((state) => post({ type: 'jev-gate', state }))
+// 待機状況を UI に流す。inFlight の増減で頻繁に発火するが、メッセージは小さいのでそのまま送る。
+// 流量制御は経路ごとに別なので、今のレースが使う経路の gate だけを購読し直す
+let unsubscribeGate: (() => void) | null = null
+function watchGate(auth: JevAuth, ratePerMin?: number) {
+  unsubscribeGate?.()
+  unsubscribeGate = null
+  if (auth.mode === 'mock') return
+  const gate = defaultGates[auth.mode]
+  if (ratePerMin != null) gate.configure({ ratePerMin })
+  unsubscribeGate = gate.subscribe((state) => post({ type: 'jev-gate', state }))
+  post({ type: 'jev-gate', state: gate.state })
+}
 
 async function setup(reqId: number, fn: () => Promise<unknown>) {
   try {
@@ -38,7 +48,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
     switch (m.type) {
       case 'start':
         runtime?.stop()
-        if (m.jevRatePerMin != null) defaultGate.configure({ ratePerMin: m.jevRatePerMin })
+        watchGate(m.auth, m.jevRatePerMin)
         runtime = new RaceRuntime(m.config, wiki(m.config.settings.lang), jevEvaluator(m.auth), post)
         await runtime.start()
         break

@@ -16,7 +16,7 @@ export function formatTokens(n: number): string {
 export function CostChip({ stats }: { stats: JevStats | undefined }) {
   if (!stats) return null
   return (
-    <span className="cost-chip" title={`JEV 呼び出し ${stats.calls} 回 / 入力 ${stats.inputTokens} トークン / 再試行 ${stats.retries} 回（再試行は課金されません）`}>
+    <span className="cost-chip" title={`${stats.provider === 'typesafe' ? 'TypeSafe 直接（コストは公表単価からの概算）' : 'AI Gateway 経由（定価ベース）'} / JEV 呼び出し ${stats.calls} 回 / 入力 ${stats.inputTokens} トークン / 再試行 ${stats.retries} 回（再試行は課金されません）`}>
       💰 {formatUsd(stats.costUsd)}
       <span className="muted small">
         {' '}
