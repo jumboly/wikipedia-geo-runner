@@ -1,0 +1,607 @@
+:root {
+  --bg: #f6f5f1;
+  --panel: #ffffff;
+  --text: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #e2e0da;
+  --accent: #d9480f;
+  --accent-soft: #fff0e6;
+  --good: #2b8a3e;
+  --bad: #c92a2a;
+  --legal: #1c5fd4;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --panel: #1f2024;
+    --text: #ececec;
+    --muted: #9a9aa2;
+    --line: #34353a;
+    --accent: #ff8a4c;
+    --accent-soft: #3a2518;
+    --good: #69db7c;
+    --bad: #ff8787;
+    --legal: #74a7ff;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+button,
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 36px;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.danger {
+  color: var(--bad);
+}
+button.big {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1em;
+}
+input,
+select,
+textarea {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 36px;
+  max-width: 100%;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+label.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+input.num {
+  width: 5em;
+}
+code {
+  font-size: 0.9em;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+header h1 {
+  font-size: 1.15em;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+header nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.banner {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 8px 16px;
+}
+.page {
+  padding: 16px;
+}
+.page.narrow {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.page h2 {
+  margin: 0 0 12px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 1em;
+}
+.card.clickable {
+  cursor: pointer;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+.span2 {
+  grid-column: span 2;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.row.wrap {
+  flex-wrap: wrap;
+}
+.row.between {
+  justify-content: space-between;
+}
+.row.end {
+  justify-content: flex-end;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.87em;
+}
+.status {
+  color: var(--accent);
+}
+.error {
+  color: var(--bad);
+}
+.hit {
+  color: var(--good);
+}
+.miss {
+  color: var(--bad);
+}
+.tag {
+  font-size: 0.75em;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.tag.goal {
+  color: var(--good);
+  border-color: var(--good);
+}
+.tag.dnf {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.runner-name {
+  font-weight: 600;
+}
+.icon {
+  font-size: 1.3em;
+}
+.seg {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.suggest-wrap {
+  position: relative;
+}
+.suggest-wrap input {
+  width: 100%;
+}
+.suggest {
+  position: absolute;
+  z-index: 1000;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.suggest li {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.suggest li:hover {
+  background: var(--accent-soft);
+}
+.runner-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.modal-back {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+.modal {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 16px;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+}
+
+/* ---- split layout: PC は地図と右パネルを左右に、スマホは縦積み＋タブ切替 ---- */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+.split-map {
+  min-height: 0;
+  position: relative;
+}
+.split-side {
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+}
+.map {
+  position: absolute;
+  inset: 0;
+}
+.race {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.race .split {
+  flex: 1;
+  height: auto;
+}
+.race .split-side {
+  display: flex;
+  flex-direction: column;
+}
+.controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.controls .turn {
+  font-weight: 700;
+}
+.controls .goal-name {
+  margin-right: auto;
+}
+.status-line {
+  padding: 4px 16px;
+  min-height: 30px;
+  font-size: 0.9em;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.tabs button {
+  flex: 1;
+}
+.mobile-only {
+  display: none;
+}
+
+.runner-marker {
+  cursor: default;
+}
+.runner-marker span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid;
+  font-size: 16px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+}
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+.map-error {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  color: var(--bad);
+  padding: 4px 10px;
+  border-radius: 8px;
+  z-index: 2;
+}
+.goal-label {
+  background: rgb(255 255 255 / 0.92);
+  color: #1d1d1f;
+  border: 2px solid #e0a100;
+  border-radius: 8px;
+  padding: 1px 8px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.log-turn {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+.log-head {
+  font-weight: 700;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+.log-move {
+  padding: 2px 0;
+}
+.goal-badge {
+  color: var(--good);
+  font-weight: 700;
+}
+.probs {
+  padding-left: 1.5em;
+}
+.route {
+  line-height: 1.8;
+  word-break: break-word;
+}
+.step.back,
+.step.forced-back {
+  color: var(--muted);
+}
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+.results th,
+.results td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px;
+  text-align: left;
+}
+
+/* ---- Reader ---- */
+.reader {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  position: relative;
+}
+.reader-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9em;
+}
+.reader-title {
+  margin: 8px 16px 0;
+  font-size: 1.4em;
+}
+.reader-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 16px 80px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.reader-body img {
+  max-width: 100%;
+  height: auto;
+}
+.reader-body table {
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.reader-body .infobox {
+  float: right;
+  margin: 0 0 8px 12px;
+  border: 1px solid var(--line);
+  max-width: 45%;
+}
+.reader-body figure,
+.reader-body .thumb {
+  margin: 8px 0;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+.reader-body a.wl.legal {
+  color: var(--legal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+.reader-body a.wl.legal.selected {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.reader-body a.wl.visited {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.reader-body a.wl.dead {
+  color: inherit;
+}
+.confirm-bar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+.confirm-bar span {
+  flex: 1;
+  font-weight: 600;
+}
+
+@media (max-width: 820px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+  .span2 {
+    grid-column: auto;
+  }
+  /* セットアップ/結果: 地図を上に固定高で、下にフォーム */
+  .split {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+  .split-map {
+    height: 42vh;
+    flex: none;
+  }
+  .split-side {
+    border-left: 0;
+    overflow: visible;
+  }
+  /* レース中: 地図/Reader/実況をタブで全画面切替 */
+  .race .split {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+  }
+  .race .split-map {
+    display: none;
+    height: auto;
+    flex: 1;
+  }
+  .race .split.tab-map .split-map {
+    display: block;
+  }
+  .race .split.tab-map .split-side {
+    display: none;
+  }
+  .race .split-side {
+    flex: 1;
+    overflow: auto;
+  }
+  .mobile-only {
+    display: flex;
+  }
+  .desktop-only {
+    display: none;
+  }
+  .reader-body .infobox {
+    float: none;
+    max-width: 100%;
+    margin: 8px 0;
+  }
+  header {
+    padding: 6px 10px;
+    flex-wrap: nowrap;
+  }
+  header h1 {
+    font-size: 1em;
+    white-space: nowrap;
+  }
+  /* ナビは折り返さず横スクロールにして縦方向の領域を地図/Reader に回す */
+  header nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  header nav button {
+    padding: 2px 8px;
+    min-height: 32px;
+    white-space: nowrap;
+  }
+  .controls {
+    padding: 6px 10px;
+  }
+}
+
+.too-large {
+  color: var(--accent);
+  font-size: 0.85em;
+}
